@@ -1,7 +1,44 @@
-use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command, value_parser};
 use dialoguer::Select;
+use std::fs;
 use std::path::Path;
-use std::{fs};
+
+#[derive(Debug)]
+enum Language {
+    Javascript,
+    Typescript,
+}
+
+#[derive(Debug)]
+enum ProofSystem {
+    Groth16,
+    Plonk,
+}
+
+#[derive(Debug)]
+enum PackageManager {
+    Yarn,
+    NPM,
+}
+
+#[derive(Debug)]
+struct SelectedArguments {
+    project_path: String,
+    language: Language,
+    proof_system: ProofSystem,
+    package_manager: PackageManager,
+}
+
+impl SelectedArguments {
+    pub fn new() -> Self {
+        SelectedArguments {
+            project_path: String::new(),
+            language: Language::Javascript,
+            proof_system: ProofSystem::Groth16,
+            package_manager: PackageManager::NPM,
+        }
+    }
+}
 
 fn main() {
     let matches = Command::new("shield")
@@ -39,34 +76,75 @@ fn main() {
 
 fn init(matched_args: &ArgMatches) {
     if let Some(path) = matched_args.get_one::<String>("path") {
-        let options = vec![
-            "Create a new shield",
-            "Overwrite the existing shield",
-            "Cancel",
-        ];
+        let mut args = SelectedArguments::new();
 
-        let selection = Select::new()
-            .with_prompt("Please choose an option")
-            .items(&options)
-            .default(0)
-            .interact()
-            .expect("Failed to read input");
-        match selection {
-            0 => {
-                println!("Creating a new shield...");
-                generate(path);
-            }
-            1 => {
-                println!("Overwriting the existing shield...");
-                generate(path);
-            }
-            2 => {
-                println!("Operation canceled.");
-                return;
-            }
-            _ => unreachable!(),
-        }
+        args.project_path = path.to_string();
+        get_language(&mut args);
+        get_proof_system(&mut args);
+        get_package_manager(&mut args);
+        println!("generating project with following configs: \n{:#?}", args)
     }
+}
+
+fn get_selection(
+    prompt: &str,
+    options: &[&str],
+    args: &mut SelectedArguments,
+    setter: fn(&mut SelectedArguments, usize),
+) {
+    let selected = Select::new()
+        .with_prompt(prompt)
+        .items(options)
+        .default(0)
+        .interact()
+        .expect("Failed to read input");
+
+    setter(args, selected);
+}
+
+fn get_language(args: &mut SelectedArguments) {
+    get_selection(
+        "Please choose language",
+        &["Javascript", "Typescript"],
+        args,
+        |args, selected| {
+            args.language = match selected {
+                0 => Language::Javascript,
+                1 => Language::Typescript,
+                _ => unreachable!(),
+            };
+        },
+    );
+}
+
+fn get_proof_system(args: &mut SelectedArguments) {
+    get_selection(
+        "Please choose proof system",
+        &["Groth16", "Plonk"],
+        args,
+        |args, selected| {
+            args.proof_system = match selected {
+                0 => ProofSystem::Groth16,
+                1 => ProofSystem::Plonk,
+                _ => unreachable!(),
+            };
+        },
+    );
+}
+
+fn get_package_manager(args: &mut SelectedArguments) {
+    get_selection(
+        "Please choose package manager",
+        &["NPM", "Yarn"],
+        args,
+        |args, selected| {
+            args.package_manager = match selected {
+                0 => PackageManager::NPM,
+                1 => PackageManager::Yarn,
+                _ => unreachable!(),
+            };
+        },
+    );
 }
 
 fn generate(path: &str) {
